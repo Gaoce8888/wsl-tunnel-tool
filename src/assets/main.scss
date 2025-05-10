@@ -1,0 +1,128 @@
+/* 全局样式 */
+
+/* 主题颜色 */
+:root {
+  --primary-color: #409EFF;
+  --success-color: #67C23A;
+  --warning-color: #E6A23C;
+  --danger-color: #F56C6C;
+  --info-color: #909399;
+  
+  --primary-text: #303133;
+  --regular-text: #606266;
+  --secondary-text: #909399;
+  --placeholder-text: #C0C4CC;
+  
+  --border-color: #DCDFE6;
+  --light-border: #E4E7ED;
+  --lighter-border: #EBEEF5;
+  --extra-light-border: #F2F6FC;
+}
+
+/* 卡片样式 */
+.app-card {
+  background-color: #fff;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.card-header {
+  border-bottom: 1px solid var(--lighter-border);
+  padding-bottom: 15px;
+  margin-bottom: 15px;
+  
+  h2 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--primary-text);
+  }
+}
+
+/* 表单样式 */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+  
+  .el-button {
+    margin-left: 10px;
+  }
+}
+
+/* 状态标签 */
+.status-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  
+  &.running {
+    background-color: rgba(103, 194, 58, 0.1);
+    color: var(--success-color);
+  }
+  
+  &.stopped {
+    background-color: rgba(144, 147, 153, 0.1);
+    color: var(--info-color);
+  }
+  
+  &.error {
+    background-color: rgba(245, 108, 108, 0.1);
+    color: var(--danger-color);
+  }
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .el-form-item {
+    margin-bottom: 22px;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+    
+    .el-button {
+      margin-left: 0;
+      margin-bottom: 10px;
+      width: 100%;
+    }
+  }
+}
+
+/* 动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* 辅助类 */
+.text-center {
+  text-align: center;
+}
+
+.mt-20 {
+  margin-top: 20px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
