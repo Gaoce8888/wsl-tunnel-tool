@@ -181,3 +181,156 @@ build_frontend() {
     
     log_success "前端准备就绪"
 }
+
+# 启动前端服务
+start_frontend() {
+    log_info "启动前端服务(端口: $FRONTEND_PORT)..."
+    
+    if [ "$PM2_AVAILABLE" = true ] && [ "$NO_DAEMON" = false ]; then
+        # 使用PM2启动
+        cd "$SCRIPT_DIR"
+        pm2 start --name wsl-tunnel-frontend npm -- run preview -- --port $FRONTEND_PORT
+        log_success "前端服务已通过PM2启动"
+    elif [ "$NODE_AVAILABLE" = true ]; then
+        # 使用Node直接启动
+        cd "$SCRIPT_DIR"
+        
+        if [ "$NO_DAEMON" = true ]; then
+            log_info "在前台启动前端服务..."
+            npm run preview -- --port $FRONTEND_PORT
+        else
+            log_info "在后台启动前端服务..."
+            nohup npm run preview -- --port $FRONTEND_PORT > "$LOG_DIR/frontend.log" 2>&1 &
+            echo $! > "$PID_FILE"
+            log_success "前端服务已启动，日志位于: $LOG_DIR/frontend.log"
+        fi
+    else
+        log_error "无法启动前端服务，请确保Node.js已安装"
+        exit 1
+    fi
+}
+
+# 启动后端服务
+start_backend() {
+    log_info "启动后端服务(端口: $BACKEND_PORT)..."
+    
+    if [ ! -d "$SCRIPT_DIR/server/node_modules" ] && [ -f "$SCRIPT_DIR/server/package.json" ]; then
+        log_info "安装后端依赖..."
+        cd "$SCRIPT_DIR/server"
+        npm install
+    fi
+    
+    if [ "$PM2_AVAILABLE" = true ] && [ "$NO_DAEMON" = false ]; then
+        # 使用PM2启动
+        cd "$SCRIPT_DIR/server"
+        PORT=$BACKEND_PORT DB_PATH=$DB_PATH pm2 start --name wsl-tunnel-backend index.js
+        log_success "后端服务已通过PM2启动"
+    elif [ "$NODE_AVAILABLE" = true ]; then
+        # 使用Node直接启动
+        cd "$SCRIPT_DIR/server"
+        
+        if [ "$NO_DAEMON" = true ]; then
+            log_info "在前台启动后端服务..."
+            PORT=$BACKEND_PORT DB_PATH=$DB_PATH node index.js
+        else
+            log_info "在后台启动后端服务..."
+            PORT=$BACKEND_PORT DB_PATH=$DB_PATH nohup node index.js > "$LOG_DIR/backend.log" 2>&1 &
+            echo $! >> "$PID_FILE"
+            log_success "后端服务已启动，日志位于: $LOG_DIR/backend.log"
+        fi
+    else
+        log_error "无法启动后端服务，请确保Node.js已安装"
+        exit 1
+    fi
+}
+
+# 主函数
+main() {
+    log_info "启动WSL内网穿透工具..."
+    
+    # 检查是否已在运行
+    if check_running; then
+        log_warning "WSL内网穿透工具已在运行"
+        read -p "是否重启服务? (y/n): " answer
+        if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
+            stop_service
+        else
+            log_info "退出，服务保持运行状态"
+            exit 0
+        fi
+    fi
+    
+    # 构建前端
+    build_frontend
+    
+    # 启动服务
+    if [ "$NO_DAEMON" = true ]; then
+        log_info "在前台启动服务..."
+        # 在前台启动前端服务，后端服务将在单独的终端中启动
+        
+        # 启动后端服务在新的终端窗口
+        if command -v gnome-terminal &> /dev/null; then
+            gnome-terminal -- bash -c "cd '$SCRIPT_DIR' && ./start.sh --backend-port=$BACKEND_PORT --no-daemon"
+        elif command -v xterm &> /dev/null; then
+            xterm -e "cd '$SCRIPT_DIR' && ./start.sh --backend-port=$BACKEND_PORT --no-daemon" &
+        elif command -v wt &> /dev/null; then
+            # Windows Terminal
+            wt -w 0 new-tab "cd '$SCRIPT_DIR' && ./start.sh --backend-port=$BACKEND_PORT --no-daemon"
+        else
+            # 如果找不到合适的终端，在后台启动后端
+            log_warning "未找到适合的终端，后端将在后台启动"
+            cd "$SCRIPT_DIR"
+            start_backend
+        fi
+        
+        # 在当前终端启动前端
+        start_frontend
+    else
+        # 正常后台启动
+        start_backend
+        start_frontend
+        
+        # 显示访问信息
+        log_success "WSL内网穿透工具已启动!"
+        log_info "前端地址: http://localhost:$FRONTEND_PORT"
+        log_info "API地址: http://localhost:$BACKEND_PORT/api"
+        log_info "日志位置: $LOG_DIR"
+        
+        echo ""
+        echo "===== 使用指南 ====="
+        echo "1. 打开浏览器访问: http://localhost:$FRONTEND_PORT"
+        echo "2. 在服务器配置页面配置外网服务器信息"
+        echo "3. 使用穿透配置页面创建端口转发规则"
+        echo "4. 查看日志页面监控穿透状态"
+        echo ""
+        echo "停止服务: $0 stop"
+        echo "===================="
+    fi
+}
+
+# 处理命令
+case "$1" in
+    stop)
+        stop_service
+        ;;
+    restart)
+        stop_service
+        sleep 2
+        main
+        ;;
+    status)
+        if check_running; then
+            PID=$(cat "$PID_FILE")
+            log_success "WSL内网穿透工具正在运行，PID: $PID"
+            log_info "前端地址: http://localhost:$FRONTEND_PORT"
+            log_info "API地址: http://localhost:$BACKEND_PORT/api"
+        else
+            log_warning "WSL内网穿透工具未运行"
+        fi
+        ;;
+    *)
+        main
+        ;;
+esac
+
+exit 0
