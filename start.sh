@@ -96,3 +96,88 @@ if command -v pm2 &> /dev/null; then
 else
     log_info "未检测到PM2，将使用标准方式启动服务"
 fi
+
+# 检查是否已有实例在运行
+check_running() {
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        if ps -p "$PID" > /dev/null 2>&1; then
+            return 0 # 正在运行
+        else
+            rm -f "$PID_FILE" # 进程不存在，删除PID文件
+            return 1 # 未运行
+        fi
+    else
+        return 1 # 未运行
+    fi
+}
+
+# 停止服务
+stop_service() {
+    log_info "停止WSL内网穿透工具服务..."
+    
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        
+        if ps -p "$PID" > /dev/null 2>&1; then
+            log_info "正在终止进程 (PID: $PID)..."
+            kill "$PID" 2>/dev/null || true
+            sleep 2
+            
+            # 如果进程仍在运行，强制终止
+            if ps -p "$PID" > /dev/null 2>&1; then
+                log_warning "正常终止失败，强制终止进程..."
+                kill -9 "$PID" 2>/dev/null || true
+            fi
+        else
+            log_warning "进程已不在运行"
+        fi
+        
+        rm -f "$PID_FILE"
+        log_success "服务已停止"
+    elif [ "$PM2_AVAILABLE" = true ]; then
+        pm2 delete wsl-tunnel-frontend wsl-tunnel-backend 2>/dev/null || true
+        log_success "通过PM2停止的服务"
+    else
+        log_warning "未找到正在运行的服务实例"
+    fi
+}
+
+# 构建前端
+build_frontend() {
+    log_info "构建前端应用..."
+    cd "$SCRIPT_DIR"
+    
+    if [ ! -d "node_modules" ]; then
+        log_info "未找到依赖，正在安装..."
+        
+        if [ -f "npm-fix.sh" ]; then
+            log_info "使用npm-fix.sh安装依赖..."
+            chmod +x npm-fix.sh
+            ./npm-fix.sh .
+        else
+            if [ "$NODE_AVAILABLE" = true ]; then
+                npm install
+            else
+                log_error "无法安装依赖，请确保Node.js已安装"
+                exit 1
+            fi
+        fi
+    fi
+    
+    # 检查dist目录是否已存在
+    if [ ! -d "dist" ]; then
+        log_info "正在构建前端..."
+        
+        if [ "$NODE_AVAILABLE" = true ]; then
+            npm run build
+        else
+            log_error "无法构建前端，请确保Node.js已安装"
+            exit 1
+        fi
+    else
+        log_info "前端已构建，使用现有构建"
+    fi
+    
+    log_success "前端准备就绪"
+}
